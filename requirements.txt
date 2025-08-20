@@ -27,7 +27,3 @@ tls-client==1.0.1
 spacy==3.8.7
 pytesseract==0.3.13
 thinc==8.3.6
-liboqs-python==0.12.0
-
-# pip install -r requirements.txt
-# rename to 0.13.0 if liboqs 13 is installed
