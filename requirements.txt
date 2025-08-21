@@ -21,7 +21,7 @@ aiohttp==3.12.14
 aiohttp_socks==0.10.1
 beautifulsoup4==4.13.4
 requests==2.32.4
-rich==14.0.0
+rich==14.1.0
 stem==1.8.2
 tls-client==1.0.1
 spacy==3.8.7
