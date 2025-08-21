@@ -8,7 +8,7 @@ Pillow==11.3.0
 pycryptodome==3.23.0
 pqcrypto==0.3.4
 PySocks==1.7.1
-phonenumbers==9.0.9
+phonenumbers==9.0.12
 requests==2.32.4
 stem==1.8.2
 shiboken6==6.9.1
