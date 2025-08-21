@@ -9,10 +9,10 @@ pycryptodome==3.23.0
 pqcrypto==0.3.4
 PySocks==1.7.1
 phonenumbers==9.0.12
-requests==2.32.4
+requests==2.32.5
 stem==1.8.2
 shiboken6==6.9.1
-requests==2.32.4
+requests==2.32.5
 matplotlib==3.10.3
 pynacl==1.5.0
 psutil==7.0.0
@@ -20,7 +20,7 @@ httpx==0.28.1
 aiohttp==3.12.15
 aiohttp_socks==0.10.1
 beautifulsoup4==4.13.4
-requests==2.32.4
+requests==2.32.5
 rich==14.1.0
 stem==1.8.2
 tls-client==1.0.1
