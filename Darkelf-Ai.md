@@ -36,7 +36,7 @@ Command (ask, ingest, summary, analysis, suggestions, osintscan, export, exit):
 
 ## 📸 Example Walkthrough — Real Terminal Session
 
-![DarkelfAi Terminal Screenshot](DarkelfAi.png)
+![DarkelfAi Terminal Screenshot](https://github.com/Darkelf2024/Darkelf-CLI-Tools/blob/main/images/DarkelfAi.png)
 
 **What happened in this session:**
 
