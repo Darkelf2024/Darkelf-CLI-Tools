@@ -26,4 +26,4 @@ stem==1.8.2
 tls-client==1.0.1
 spacy==3.8.7
 pytesseract==0.3.13
-thinc==8.3.6
+thinc==9.1.1
