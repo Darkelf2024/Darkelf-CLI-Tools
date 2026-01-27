@@ -111,11 +111,14 @@ from stem.control import Controller
 from stem import Signal as StemSignal
 from stem import process as stem_process
 
+TOR_PORT = 9052  # detected from tor startup
+PROXY = f"socks5h://127.0.0.1:{TOR_PORT}"
+
 def get_tor_session():
     session = requests.Session()
     session.proxies = {
         "http": "socks5h://127.0.0.1:9052",
-        "https": "socks5h://127.0.0.1:9052",
+        #"https": "socks5h://127.0.0.1:9052",
     }
     return session
 def setup_logging():
