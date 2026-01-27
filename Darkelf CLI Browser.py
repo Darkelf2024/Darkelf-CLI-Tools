@@ -118,7 +118,7 @@ def get_tor_session():
     session = requests.Session()
     session.proxies = {
         "http": "socks5h://127.0.0.1:9052",
-        #"https": "socks5h://127.0.0.1:9052",
+        "https": "socks5h://127.0.0.1:9052",
     }
     return session
 def setup_logging():
