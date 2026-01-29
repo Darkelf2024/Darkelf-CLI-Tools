@@ -1,4 +1,4 @@
-# 🧠 Darkelf CLI Browser – Post-Quantum OSINT & Secure Tor Terminal
+# 🧠 Darkelf CLI Post-Quantum OSINT & Secure Tor Terminal
 
 Darkelf CLI is a post-quantum hardened OSINT Tool Kit and messaging platform for adversarial or censorship-heavy environments. Designed for operatives, researchers, and red teamers, it provides powerful reconnaissance and secure communication with memory-safe features and zero-API intelligence gathering.
 
