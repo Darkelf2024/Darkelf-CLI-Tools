@@ -67,7 +67,6 @@ import os
 import sys
 import secrets
 import subprocess  # nosec B404
-import socket
 import time
 import re
 import random
@@ -99,95 +98,24 @@ from urllib.parse import quote_plus
 
 from urllib.parse import quote_plus, parse_qs, urlparse, unquote, urljoin
 
-# --- Tor integration ---
-
-
-def is_tor_running(host="127.0.0.1", port=9052):
-    try:
-        with socket.create_connection((host, port), timeout=1):
-            return True
-    except OSError:
-        return False
-
-
-def ensure_tor():
-    tor_bin = shutil.which("tor")
-    if not tor_bin:
-        raise RuntimeError("Tor binary not found")
-
-    # Validate binary path (helps satisfy Bandit)
-    if not os.path.isfile(tor_bin) or not os.access(tor_bin, os.X_OK):
-        raise RuntimeError(f"Invalid Tor binary: {tor_bin}")
-
-    # Check if already running
-    if is_tor_running():
-        return
-
-    print("[info] Starting Tor...")
-
-    try:
-        subprocess.Popen(
-            [
-                tor_bin,
-                "--SocksPort", "127.0.0.1:9052",
-                "--ControlPort", "127.0.0.1:9053",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True,
-        ) # nosec B603
-    except OSError as e:
-        raise RuntimeError(f"Failed to launch Tor: {e}") from e
-
-    # Wait for Tor to boot
-    for _ in range(30):
-        if is_tor_running():
-            print("[info] Tor started successfully")
-            return
-        time.sleep(1)
-
-    raise RuntimeError("Tor failed to start")
-
-
-def renew_tor_identity():
-    try:
-        s = socket.create_connection(("127.0.0.1", 9053), timeout=2)
-        s.send(b"AUTHENTICATE\r\nSIGNAL NEWNYM\r\nQUIT\r\n")
-        s.close()
-    except Exception as e:
-        print("[warn] Tor NEWNYM failed:", e)
-
+console = Console()
 
 # ---------- DuckDuckGo + CLI Browser ----------
 
 DUCK_URL = "https://duckduckgo.com/html/"
-DUCKDUCKGO_LITE = (
-    "https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/lite"
-)
-
-
-def get_tor_session():
-    session = requests.Session()
-    session.proxies = {
-        "http": "socks5h://127.0.0.1:9052",
-        "https": "socks5h://127.0.0.1:9052",
-    }
-    return session
-
-
-console = Console()
-
+SEARCH_ENDPOINTS = [
+    "https://html.duckduckgo.com/html/",
+    "https://duckduckgo.com/html/",
+    "https://duckduckgo.com/lite/",
+]
 
 def run(self):
     console.print("[bold green]Darkelf CLI Browser[/bold green]\n")
 
-    ensure_tor()
-    session = get_tor_session()
-
     while True:
         try:
             cmd = Prompt.ask(
-                "[bold magenta]darkelf[/bold magenta] " "(search, open, onion, quit)"
+                "[bold magenta]darkelf[/bold magenta] " "(search, open, quit)"
             ).strip()
 
             if cmd in ("quit", "exit"):
@@ -210,13 +138,6 @@ def run(self):
                     url = "http://" + url
 
                 fetch_and_display(url, session=session)
-
-            elif cmd == "onion":
-                keywords = Prompt.ask("Keywords")
-                onion_discovery(keywords)
-
-            else:
-                console.print("[red]Unknown command[/red]")
 
         except KeyboardInterrupt:
             console.print("\n[red]Exiting browser[/red]")
@@ -288,26 +209,14 @@ def setup_logging(debug=False):
         logging.getLogger().addHandler(logging.NullHandler())
 
 
-DUCKDUCKGO_LITE = (
-    "https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/lite"
-)
-
-DECOY_ONIONS = [
-    "http://msydqstlz2kzerdg.onion",  # Tor Project
-    "http://zlal32teyptf4tvi.onion",  # DuckDuckGo old
-    "http://protonirockerxow.onion",  # ProtonMail
-    "http://searxspbitokayvkhzhsnljde7rqmn7rvogyv6o3ap7k2lnwczh2fad.onion",  # Searx
-    "http://3g2upl4pq6kufc4m.onion",  # DuckDuckGo
-    "http://torwikizhdeyutd.onion",  # Tor Wiki
-    "http://libraryqtlpitkix.onion",  # Library Genesis
-]
+DUCKDUCKGO_LITE = "https://html.duckduckgo.com/html/"
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; rv:102.0) Gecko/20100101 Firefox/102.0",
     "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:78.0) Gecko/20100101 Firefox/78.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
 ]
 ACCEPT_LANGUAGES = [
     "en-US,en;q=0.5",
@@ -321,18 +230,6 @@ REFERERS = [
     "https://startpage.com/",
     "https://example.com/",
 ]
-
-
-# Optional: Use aiohttp_socks if routing through Tor
-try:
-    from aiohttp_socks import ProxyConnector
-except ImportError:
-    ProxyConnector = None
-
-
-def get_tor_proxy():
-    return f"socks5h://127.0.0.1:9052"
-
 
 def random_headers(extra_stealth_options=None):
     headers = {
@@ -382,7 +279,7 @@ def random_delay(extra_stealth_options=None):
 def fetch_with_requests(
     url, session=None, extra_stealth_options=None, debug=False, method="GET", data=None
 ):
-    proxies = {"http": get_tor_proxy(), "https": get_tor_proxy()}
+    proxies = None
     headers = random_headers(extra_stealth_options)
     try:
         random_delay(extra_stealth_options)
@@ -391,10 +288,13 @@ def fetch_with_requests(
             req_session = requests.Session()
         if method == "POST":
             resp = req_session.post(
-                url, data=data, proxies=proxies, headers=headers, timeout=30
+                url,
+                data=data,
+                headers=headers,
+                timeout=30
             )
         else:
-            resp = req_session.get(url, proxies=proxies, headers=headers, timeout=30)
+            resp = req_session.get(url, headers=headers, timeout=30)
         resp.raise_for_status()
         random_delay(extra_stealth_options)
         if debug:
@@ -435,25 +335,6 @@ def parse_ddg_lite_results(soup):
 
     return results if results else "no_results"
 
-
-def check_my_ip():
-    try:
-        html, _ = fetch_with_requests("http://check.torproject.org", debug=False)
-
-        if "Congratulations" in html:
-            console.print("✅ You're using Tor correctly.")
-            return
-
-    except Exception as e:
-        if debug:
-            console.print(f"[yellow]⚠ Error (ignored):[/yellow] {e}")
-
-    # 🔥 fallback check
-    try:
-        html, _ = fetch_with_requests("http://httpbin.org/ip", debug=False)
-        console.print(f"🌐 Tor IP check (fallback): {html}")
-    except Exception as e:
-        console.print(f"❌ Tor check failed completely: {e}")
         
 def fallback_search(query, extra_stealth_options=None):
     engines = [
@@ -616,153 +497,6 @@ def paginate_output(text):
             console.print("[bold green]>>[/bold green] ", end="")
             input("\n-- More -- Press Enter to continue...")
 
-
-# 🔥 Built-in onion directory (safe/public services only)
-BUILTIN_ONIONS = [
-    ("DuckDuckGo (Tor)", "http://3g2upl4pq6kufc4m.onion"),
-    ("ProtonMail", "http://protonirockerxow.onion"),
-    ("SecureDrop", "http://secrdrop5wyphb5x.onion"),
-    ("Tor Project", "http://expyuzz4wqqyqhjn.onion"),
-    ("BBC News (Tor)", "http://bbcnewsv2vjtpsuy.onion"),
-    ("NYTimes (Tor)", "http://nytimes3xbfgragh.onion"),
-    ("Facebook (Tor)", "http://facebookcorewwwi.onion"),
-    ("The Hidden Wiki (example)", "http://zqktlwi4fecvo6ri.onion"),
-]
-
-
-def onion_discovery(keywords, extra_stealth_options=None):
-
-    console.print(f"🌐 Discovering .onion services for: [bold]{keywords}[/bold]\n")
-
-    seen = set()
-    results = []
-
-    # =========================
-    # 1. BUILT-IN DIRECTORY
-    # =========================
-    keyword_lower = keywords.lower()
-    for name, url in BUILTIN_ONIONS:
-        if keyword_lower in name.lower() or keyword_lower in url:
-            if url not in seen:
-                seen.add(url)
-                results.append((f"[builtin] {name}", url))
-
-    # =========================
-    # 2. TOR SEARCH (AHMIA)
-    # =========================
-    ahmia_url = (
-        "http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion/search/?q="
-        + quote_plus(keywords)
-    )
-
-    html = None
-
-    for attempt in range(3):
-        try:
-            console.print(f"[cyan]  ▪ Tor search attempt {attempt+1}[/cyan]")
-
-            html, _ = fetch_with_requests(
-                ahmia_url,
-                extra_stealth_options=extra_stealth_options,
-                debug=False,
-            )
-
-            if html and "[Network error]" not in html:
-                break
-
-        except Exception as e:
-            if debug:
-                console.print(f"[yellow]⚠ Attempt failed:[/yellow] {e}")
-        try:
-            renew_tor_identity()
-        except Exception as e:
-            if debug:
-                console.print(f"[yellow]⚠ Tor identity rotation failed:[/yellow] {e}")
-        
-        time.sleep(2)
-
-    # --- Parse Ahmia ---
-    if html and "[Network error]" not in html:
-        soup = BeautifulSoup(html, "html.parser")
-
-        for a in soup.find_all("a", href=True):
-            href = a["href"].strip()
-            text = a.get_text(strip=True)
-
-            if "redirect" in href:
-                parsed = urlparse(href)
-                qs = parse_qs(parsed.query)
-                real = unquote(qs.get("url", [""])[0])
-                if ".onion" in real:
-                    href = real
-                else:
-                    continue
-
-            if ".onion" not in href:
-                continue
-
-            href = href.rstrip("/")
-
-            if href not in seen:
-                seen.add(href)
-                results.append((text or "[ahmia]", href))
-
-    else:
-        console.print("[yellow]  ▪ Tor search failed → using clearnet fallback[/yellow]")
-
-    # =========================
-    # 3. CLEARNET FALLBACK
-    # =========================
-    fallback_engines = [
-        ("DDG Lite", f"https://duckduckgo.com/lite/?q={quote_plus(keywords + ' onion')}"),
-        ("DDG HTML", f"https://duckduckgo.com/html/?q={quote_plus(keywords + ' onion')}"),
-        ("Brave", f"https://search.brave.com/search?q={quote_plus(keywords + ' onion')}"),
-    ]
-
-    for name, url in fallback_engines:
-        try:
-            console.print(f"[cyan]  ▪ {name} fallback[/cyan]")
-
-            html, _ = fetch_with_requests(url, debug=False)
-
-            soup = BeautifulSoup(html, "html.parser")
-
-            for a in soup.find_all("a", href=True):
-                href = a.get("href", "").strip()
-                text = a.get_text(strip=True)
-
-                # Extract onion links even from redirect URLs
-                if "uddg=" in href:
-                    parsed = urlparse(href)
-                    qs = parse_qs(parsed.query)
-                    real = unquote(qs.get("uddg", [""])[0])
-                    if ".onion" in real:
-                        href = real
-
-                if ".onion" not in href:
-                    continue
-
-                href = href.rstrip("/")
-
-                if href not in seen:
-                    seen.add(href)
-                    results.append((text or f"[{name}]", href))
-
-        except Exception as e:
-            console.print(f"[yellow]  ▪ {name} failed: {e}[/yellow]")
-
-    # =========================
-    # 4. OUTPUT
-    # =========================
-    if results:
-        console.print(f"\n[green]Found {len(results)} onion links:[/green]\n")
-
-        for title, link in results[:25]:
-            console.print(f"  ▪ [bold]{title}[/bold]\n    {link}")
-    else:
-        console.print("[yellow]  ▪ No onion services found.[/yellow]")
-
-
 def cli_browser():
     setup_logging()
     ensure_strong_entropy()
@@ -876,22 +610,9 @@ DARKELF_THEMES = {
 }
 
 
-def get_key():
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        if ch == "\x1b":
-            ch += sys.stdin.read(2)
-        return ch
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
-
 def fetch_browser_page(url, debug=False):
     try:
-        cmd = ["curl", "--socks5-hostname", "127.0.0.1:9052", "-L", "-m", "40", url]
+        cmd = ["curl", "-L", "-m", "40", url]
 
         # ⚠️ REVIEW: subprocess usage
         result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603
@@ -1644,13 +1365,21 @@ class DarkelfCLIBrowser:
 
     def simulate_search_prompt(self):
         console.print("\n[bold cyan]Search DuckDuckGo:[/bold cyan]", end=" ")
+
         query = input().strip()
+
         if query:
             encoded_query = requests.utils.quote(query)
-            url = f"https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/html/?q={encoded_query}"
+
+            url = (
+                f"https://html.duckduckgo.com/html/?q={encoded_query}"
+            )
+
             self.visit(url)
+
             if self.current_page:
                 self.current_page.title = f"Search DuckDuckGo: {query}"
+
             self.needs_render = True
 
     def secure_wipe(self):
@@ -1851,9 +1580,6 @@ Commands:
   search <query>      - Search DuckDuckGo (onion)
   open <url>          - Open a URL
   debug <query>       - Debug search
-  findonions <query>  - Discover onion services
-  tornew              - Renew Tor identity
-  checkip             - Verify Tor routing
   stealth             - Toggle stealth mode
   exit                - Quit
 """)
@@ -1875,12 +1601,6 @@ def run_browser_mode():
     browser = DarkelfCLIBrowser()
     browser.run()
 
-
-def launch_browser_in_new_terminal():
-    console.print("[yellow]Launching browser in current terminal...[/yellow]\n")
-    run_browser_mode()
-
-
 def main():
     if "--browser" in sys.argv:
         run_browser_mode()
@@ -1894,10 +1614,7 @@ def main_menu():
     while True:
         console.print("""
 [1] Browser
-[2] Onion Discovery
-[3] Check Tor IP
-[4] Renew Tor Identity
-[5] CLI Mode
+[2] CLI Mode
 [Q] Quit
 """)
 
@@ -1908,16 +1625,6 @@ def main_menu():
             browser.run()
 
         elif choice == "2":
-            kw = input("Keywords: ")
-            onion_discovery(kw)
-
-        elif choice == "3":
-            check_my_ip()
-
-        elif choice == "4":
-            renew_tor_identity()
-
-        elif choice == "5":
             repl_main()
 
         elif choice == "q":
@@ -1925,13 +1632,6 @@ def main_menu():
 
         else:
             console.print("[red]Invalid option[/red]")
-
-
-#def main():
-    #if "--browser" in sys.argv:
-      #  run_browser_mode()
-    #else:
-      #  main_menu()
 
 if __name__ == "__main__":
     main()
