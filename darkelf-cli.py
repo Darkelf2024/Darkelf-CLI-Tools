@@ -1493,10 +1493,10 @@ class DarkelfCLIBrowser:
 def repl_main():
     console.print("🧭 Darkelf CLI - Browser Mode\n")
 
-    ensure_tor()
-    session = get_tor_session()
-
     stealth_on = True
+
+    # FIX: create persistent session
+    session = requests.Session()
 
     extra_stealth_options = {
         "random_order": True,
